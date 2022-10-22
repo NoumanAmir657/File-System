@@ -104,6 +104,7 @@ FDIR* chDir(FDIR*, FDIR*, string);
 void mkDir(string, FDIR*, FDIR*);
 void createFile(string, FDIR*, FDIR*, int&, vector<pair<bool, string>>&, vector<int>&);
 void deleteFile(string, FDIR*, FDIR*, vector<pair<bool, string>>&, vector<int>&);
+void moveFile(string, string, FDIR*, FDIR*);
 FileObject* openFile(string, char, FDIR*, FDIR*);
 
 int main() {
@@ -199,6 +200,19 @@ int main() {
                 break;
             }
             case 6: {
+                string source;
+                cout << "Enter source: ";
+                cin >> source;
+
+                string dest;
+                cout << "Enter dest: ";
+                cin >> dest;
+
+                moveFile(source, dest, root, currentDirectory);
+                cout << "Current working directory: " + getPath(currentDirectory) << '\n';
+                break;
+            }
+            case 7: {
                 root = reconstruct();
                 currentDirectory = root;
                 break;
@@ -305,7 +319,6 @@ void bfs(FDIR* root) {
         for (int i = 0; i < p->externals.size(); ++i) {
             tmp = tmp + "," + to_string(p->externals[i]);
         }
-        cout << tmp;
 
         structFile << p->name << ',' << 0 << ',' << (int) p->type << ',' << p->childrens.size() << ',' << p->numberOfBlocks << tmp << "\n";
         q.pop();
@@ -484,6 +497,54 @@ void deleteFile(string path, FDIR* root, FDIR* currentDirectory, vector<pair<boo
     else {
         cout << "File not found in the specified directory!\n";
     }
+}
+
+void moveFile(string source, string dest, FDIR* root, FDIR* currentDirectory) {
+    // source
+    // tokenize path
+    vector<string> tokens;
+    tokenizePath(source, tokens);
+
+    // remove last element
+    string sourceName = tokens[tokens.size() - 1];
+    tokens.pop_back();
+
+    // change directory
+    FDIR* sourceDir = NULL;
+    if (tokens.size() != 0) {
+        sourceDir = chDir(root, currentDirectory, tokens, source[0] == '/' ? 1 : 0);
+    }
+
+    // dest
+    // tokenize path
+    tokens.clear();
+    tokenizePath(dest, tokens);
+
+    // change directory
+    FDIR* destDir = NULL;
+    if (tokens.size() != 0) {
+        destDir = chDir(root, currentDirectory, tokens, dest[0] == '/' ? 1 : 0);
+    }
+
+    // get File
+    int tmp = -1;
+    for (int i = 0; i < sourceDir->childrens.size(); ++i) {
+        if (sourceName == sourceDir->childrens[i]->name) {
+            tmp = i;
+            break;
+        }
+    }
+
+    sourceDir->childrens[tmp]->parent = destDir;
+
+    destDir->numberOfChildren++;
+    destDir->childrens.push_back(sourceDir->childrens[tmp]);
+
+    FDIR *p = sourceDir->childrens[tmp];
+    sourceDir->childrens[tmp] = sourceDir->childrens[sourceDir->childrens.size() - 1];
+    sourceDir->childrens[sourceDir->childrens.size() - 1] = p;
+    sourceDir->childrens.pop_back();
+    sourceDir->numberOfChildren--; 
 }
 
 FDIR* chDir(FDIR* root, FDIR* currentDirectory, string path) {

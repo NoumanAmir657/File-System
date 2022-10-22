@@ -1,7 +1,7 @@
 // add same file and dir name check
 // file does not exist check when deleting
-// blocks in order
 // check for running out of blocks in append
+// dir not exist or file not exist in move
 
 #include <iostream>
 #include <fstream>
@@ -17,6 +17,11 @@ using namespace std;
 #define TOTAL_MEMORY 1024
 
 bool hasReachedEnd = false;
+
+struct CONTENT {
+    string content;
+    bool used;
+};
 
 struct FDIR {
     string name;
@@ -72,11 +77,14 @@ struct FileObject {
                     this->file->externals.push_back(freeBlock);
                     getFreeBlockIndex(freedBlockList, freeBlock);
                     dataLength -= BLOCK_SIZE;
+                    spaceLeftInLastBlock = spaceLeftInLastBlock + BLOCK_SIZE;
+                    this->file->numberOfBlocks++;
                 }
                 else {
                     blocks[freeBlock].second += data.substr(spaceLeftInLastBlock, dataLength);
                     this->file->externals.push_back(freeBlock);
                     getFreeBlockIndex(freedBlockList, freeBlock);
+                    this->file->numberOfBlocks++;
                     break;
                 }
             }
@@ -97,6 +105,8 @@ void freeTree(FDIR*);
 string getPath(FDIR*);
 void tokenizePath(string, vector<string>&);
 void getFreeBlockIndex(vector<int>&);
+void writeContent(vector<pair<bool, string>>&);
+void readContent(vector<pair<bool, string>>&);
 
 // lab functions
 FDIR* chDir(FDIR*, FDIR*, vector<string>&, int);
@@ -215,12 +225,14 @@ int main() {
             case 7: {
                 root = reconstruct();
                 currentDirectory = root;
+                readContent(blocks);
                 break;
             }
             default: {
                 bfs(root);
                 freeTree(root);
-                exit(0);
+                writeContent(blocks);
+                //exit(0);
             }
         }
     } while(true);
@@ -352,6 +364,7 @@ FDIR* reconstruct() {
     FDIR *current = new FDIR(tmps[0], (bool) stoi(tmps[2]), NULL);
     current->size = stoi(tmps[1]);
     current->numberOfChildren = stoi(tmps[3]);
+    current->numberOfBlocks = 0;
 
     FDIR *root = current;
 
@@ -369,6 +382,11 @@ FDIR* reconstruct() {
         p->size = stoi(tmps[1]);
         p->numberOfChildren = stoi(tmps[3]);
         p->numberOfBlocks = stoi(tmps[4]);
+
+        for (int k = 5; k < 5 + p->numberOfBlocks; ++k) {
+            p->externals.push_back(stoi(tmps[k]));
+        }
+
         p->parent = current;
         
         current->childrens.push_back(p);
@@ -645,4 +663,30 @@ void getFreeBlockIndex(vector<int>& freedBlockList, int& freeBlock) {
     else {
         freeBlock++;
     }
+}
+
+void writeContent(vector<pair<bool, string>>& blocks) {
+    FILE* p = fopen("sample.data", "w");
+
+    for (int i = 0; i < blocks.size(); ++i) {
+        CONTENT* cnt = new CONTENT();
+        cnt->content = blocks[i].second;
+        cnt->used = blocks[i].first;
+        fwrite(cnt, sizeof(CONTENT), 1, p);   
+    }
+
+    fclose(p);
+}
+
+void readContent(vector<pair<bool, string>>& blocks) {
+    FILE* p = fopen("sample.data", "r");
+
+    CONTENT *cnt = new CONTENT();
+    for (int i = 0; i < blocks.size(); ++i) {
+        fread(cnt, sizeof(CONTENT), 1, p);
+        blocks[i].second = cnt->content;
+        blocks[i].first = cnt->used;
+    }
+
+    fclose(p);
 }

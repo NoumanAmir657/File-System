@@ -175,6 +175,49 @@ struct FileObject {
         }
         blocks[this->file->externals[this->file->externals.size() - 1]].second = original.substr(tmp, dataLeft);
     }
+
+    void truncateFile(vector<pair<bool, string>>& blocks, vector<int>& freedBlockList, int size) {
+        string original = this->read(blocks);
+        int originalSize = original.length();
+
+        // truncate
+        original = original.substr(0, size);
+
+        int blocksReq = (original.length() / BLOCK_SIZE) + 1;
+
+        int tmp = 0;
+        int dataLeft = original.length();
+        for (int i = 0; i < blocksReq - 1; ++i) {
+            blocks[this->file->externals[i]].second = original.substr(tmp, BLOCK_SIZE);
+            tmp += BLOCK_SIZE;
+            dataLeft -= BLOCK_SIZE;
+        }
+        blocks[this->file->externals[blocksReq - 1]].second = original.substr(tmp, dataLeft);
+
+        int sizeOfExternals = this->file->externals.size();
+        for (int j = blocksReq; j < sizeOfExternals; ++j) {
+            blocks[this->file->externals[j]].first = false;
+            blocks[this->file->externals[j]].second = "";
+            freedBlockList.push_back(this->file->externals[j]);
+        }
+
+        for (int j = blocksReq; j < sizeOfExternals; ++j) {
+            this->file->externals.pop_back();
+        }
+
+        this->file->parent->size -= this->file->size;
+        this->file->parent->size += original.length();
+        FDIR* p = this->file->parent->parent;
+
+        while (p != NULL) {
+            p->size -= this->file->size;
+            p->size += original.length();
+            p = p->parent;
+        }
+
+        this->file->size = original.length();
+        this->file->numberOfBlocks = this->file->externals.size();
+    }
 };
 
 // utilities
@@ -324,7 +367,15 @@ int main() {
                     cin >> to;
 
                     fileObject->moveWithin(blocks, from, to, size);
-                } 
+                }
+                else if (mode == 't') {
+                    int size;
+
+                    cout << "Enter size: ";
+                    cin >> size;
+
+                    fileObject->truncateFile(blocks, freedBlockList, size);
+                }
                 break;
             }
             case 6: {

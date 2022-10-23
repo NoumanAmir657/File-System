@@ -784,7 +784,7 @@ void writeContent(vector<pair<bool, string>>& blocks) {
 }
 
 void readContent(vector<pair<bool, string>>& blocks) {
-    FILE* p = fopen("sample.data", "r");
+    FILE* p = fopen("sample.dat", "r");
 
     CONTENT *cnt = new CONTENT();
     for (int i = 0; i < blocks.size(); ++i) {

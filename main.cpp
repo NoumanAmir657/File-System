@@ -150,6 +150,31 @@ struct FileObject {
 
         return data.substr(readPos, readSize);
     }
+
+    void moveWithin(vector<pair<bool, string>>& blocks, int from, int to, int size) {
+        string original = this->read(blocks);
+        if (from + size > original.length()) {
+            cout << "Out of length for file\n";
+            return;
+        }
+
+        string sub = original.substr(from, size);
+        original.replace(from, size, "");
+        
+        string sub2 = original.substr(0, to);
+        sub2 = sub2 + sub + original.substr(to, original.length() - to);
+        
+        original = sub2;
+
+        int tmp = 0;
+        int dataLeft = original.length();
+        for (int i = 0; i < this->file->externals.size() - 1; ++i) {
+            blocks[this->file->externals[i]].second = original.substr(tmp, BLOCK_SIZE);
+            tmp += BLOCK_SIZE;
+            dataLeft -= BLOCK_SIZE;
+        }
+        blocks[this->file->externals[this->file->externals.size() - 1]].second = original.substr(tmp, dataLeft);
+    }
 };
 
 // utilities
@@ -286,6 +311,20 @@ int main() {
                         cout << fileObject->readFrom(blocks, readPos, readSize) << '\n';
                     }
                 }
+                else if (mode == 'm') {
+                    int from, size, to;
+                    
+                    cout << "Enter from: ";
+                    cin >> from;
+                    
+                    cout << "Enter size: ";
+                    cin >> size;
+                    
+                    cout << "Enter to: ";
+                    cin >> to;
+
+                    fileObject->moveWithin(blocks, from, to, size);
+                } 
                 break;
             }
             case 6: {
@@ -765,7 +804,7 @@ void getFreeBlockIndex(vector<int>& freedBlockList, int& freeBlock) {
 }
 
 void writeContent(vector<pair<bool, string>>& blocks) {
-    FILE* p = fopen("sample.data", "w");
+    FILE* p = fopen("sample.dat", "w");
 
 
     for (int i = 0; i < blocks.size(); ++i) {

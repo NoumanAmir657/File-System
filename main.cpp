@@ -14,7 +14,7 @@
 using namespace std;
 
 #define BLOCK_SIZE 16
-#define TOTAL_MEMORY 1024
+#define TOTAL_MEMORY 128
 
 bool hasReachedEnd = false;
 
@@ -856,6 +856,11 @@ void getFreeBlockIndex(vector<int>& freedBlockList, int& freeBlock) {
     }
     else {
         freeBlock++;
+
+        if (freeBlock == TOTAL_MEMORY / BLOCK_SIZE) {
+            hasReachedEnd = true;
+            getFreeBlockIndex(freedBlockList, freeBlock);
+        }
     }
 }
 

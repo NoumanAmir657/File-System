@@ -67,6 +67,10 @@ struct FileObject {
             dataLength -= spaceLeftInLastBlock;
             
             while (true) {
+                if (freeBlock == -1) {
+                    cout << "Ran out of space\n";
+                    return;
+                }
                 blocks[freeBlock].first = true;
                 if (dataLength > BLOCK_SIZE) {
                     blocks[freeBlock].second += data.substr(spaceLeftInLastBlock, BLOCK_SIZE);
@@ -118,6 +122,11 @@ struct FileObject {
 
     void writeAt(vector<pair<bool, string>>& blocks, int& freeBlock, vector<int>& freedBlockList, string data, int writePos) {
         string original = this->read(blocks);
+
+        if (writePos + data.length() > original.length()) {
+            cout << "Out of length for file\n";
+            return;
+        }
 
         original.replace(writePos, data.length(), data);
 
@@ -579,6 +588,15 @@ void deleteFile(string path, FDIR* root, FDIR* currentDirectory, vector<pair<boo
         // decrement dir childrenCount
         currentDirectory->numberOfChildren--;
 
+        // change size of dir
+        currentDirectory->size -= p->size;
+        // traverse to parents and change size
+        FDIR* par = currentDirectory->parent;
+        while (par != NULL) {
+            par->size -= p->size;
+            par = par->parent;
+        }
+
         // delete file
         freeTree(currentDirectory->childrens[tmp]);
     }
@@ -603,15 +621,10 @@ void moveFile(string source, string dest, FDIR* root, FDIR* currentDirectory) {
         sourceDir = chDir(root, currentDirectory, tokens, source[0] == '/' ? 1 : 0);
     }
 
-    // dest
-    // tokenize path
-    tokens.clear();
-    tokenizePath(dest, tokens);
-
     // change directory
     FDIR* destDir = NULL;
     if (tokens.size() != 0) {
-        destDir = chDir(root, currentDirectory, tokens, dest[0] == '/' ? 1 : 0);
+        destDir = chDir(root, currentDirectory, dest);
     }
 
     // get File
@@ -621,6 +634,21 @@ void moveFile(string source, string dest, FDIR* root, FDIR* currentDirectory) {
             tmp = i;
             break;
         }
+    }
+
+    // change size
+    sourceDir->size -= sourceDir->childrens[tmp]->size;
+    FDIR* par = sourceDir->parent;
+    while (par != NULL) {
+        par->size -= sourceDir->childrens[tmp]->size;
+        par = par->parent;
+    }
+
+    destDir->size += sourceDir->childrens[tmp]->size;
+    par = destDir->parent;
+    while (par != NULL) {
+        par->size += sourceDir->childrens[tmp]->size;
+        par = par->parent;
     }
 
     sourceDir->childrens[tmp]->parent = destDir;
@@ -638,6 +666,7 @@ void moveFile(string source, string dest, FDIR* root, FDIR* currentDirectory) {
 FDIR* chDir(FDIR* root, FDIR* currentDirectory, string path) {
     vector<string> tokens;
     tokenizePath(path, tokens);
+    if (path.length() == 1 && path[0] == '/') {return root;}
     return chDir(root, currentDirectory, tokens, path[0] == '/' ? 1 : 0);
 }
 

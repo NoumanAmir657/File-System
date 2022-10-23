@@ -239,6 +239,7 @@ void createFile(string, FDIR*, FDIR*, int&, vector<pair<bool, string>>&, vector<
 void deleteFile(string, FDIR*, FDIR*, vector<pair<bool, string>>&, vector<int>&);
 void moveFile(string, string, FDIR*, FDIR*);
 FileObject* openFile(string, char, FDIR*, FDIR*);
+void displayFileInfo(FDIR*);
 
 int main() {
     // blocks vector with fixed size
@@ -396,6 +397,10 @@ int main() {
                 root = reconstruct();
                 currentDirectory = root;
                 readContent(blocks);
+                break;
+            }
+            case 8: {
+                displayFileInfo(root);
                 break;
             }
             default: {
@@ -888,4 +893,38 @@ void readContent(vector<pair<bool, string>>& blocks) {
     }
 
     fclose(p);
+}
+
+void displayFileInfo(FDIR* root){
+    queue<FDIR*> q;
+    FDIR *p = root;
+
+    if (p != NULL){
+        q.push(p);
+    }
+
+    while (!q.empty()){
+        p = q.front();
+        q.pop();
+
+        string tmp = "";
+        for (int i = 0; i < p->externals.size(); ++i) {
+            tmp += to_string(p->externals[i]) + " ";
+        }
+
+        if (p->type == 1) {
+            cout << "File name:\t\t" << p->name << '\n';
+            cout << "Parent Directory:\t" << p->parent->name << '\n';
+            cout << "Size:\t\t\t" << p->size << '\n';
+            cout << "Number of Blocks:\t" << p->numberOfBlocks << '\n';
+            cout << "Blocks List:\t\t" << tmp << '\n';
+            cout << "\n\n";
+        }
+
+        for (int i = 0; i < p->childrens.size(); ++i){
+            if (p->childrens[i] != NULL) {
+                q.push(p->childrens[i]);
+            }
+        }
+    }
 }

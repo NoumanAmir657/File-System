@@ -19,7 +19,7 @@ using namespace std;
 bool hasReachedEnd = false;
 
 struct CONTENT {
-    string content;
+    char content[BLOCK_SIZE];
     bool used;
 };
 
@@ -52,11 +52,7 @@ struct FileObject {
         this->mode = mode;
     }
 
-    void append(vector<pair<bool, string>>& blocks, int& freeBlock, vector<int>& freedBlockList) {
-        string data;
-        cout << "Enter content to write in file: ";
-        cin.ignore();
-        getline(cin, data);
+    void append(vector<pair<bool, string>>& blocks, int& freeBlock, vector<int>& freedBlockList, string data) {
         int dataLength = data.length();
 
         int lastBlock = this->file->externals[this->file->externals.size() - 1];
@@ -89,12 +85,62 @@ struct FileObject {
                 }
             }
         }
+
+        int oldSize = this->file->size;
+        // subtract old file size
+        this->file->parent->size -= oldSize;
+
+        // calculate new file size
+        this->file->size = (this->file->externals.size() - 1) * BLOCK_SIZE + blocks[this->file->externals[this->file->externals.size() - 1]].second.length();
+
+        // add new file size
+        this->file->parent->size += this->file->size;
+
+        // traverse to parent
+        FDIR* tmp = this->file->parent->parent;
+
+        while (tmp != NULL) {
+            tmp->size -= oldSize;
+            tmp->size += this->file->size;
+            tmp = tmp->parent;
+        }
     }
 
-    // read
-    // write
-    // truncate
-    // move content within a file
+    string read(vector<pair<bool, string>>& blocks) {
+        string data = "";
+
+        for (int i = 0; i < this->file->externals.size(); ++i) {
+            data += blocks[this->file->externals[i]].second;
+        }
+
+        return data;
+    }
+
+    void writeAt(vector<pair<bool, string>>& blocks, int& freeBlock, vector<int>& freedBlockList, string data, int writePos) {
+        string original = this->read(blocks);
+
+        original.replace(writePos, data.length(), data);
+
+        int tmp = 0;
+        int dataLeft = original.length();
+        for (int i = 0; i < this->file->externals.size() - 1; ++i) {
+            blocks[this->file->externals[i]].second = original.substr(tmp, BLOCK_SIZE);
+            tmp += BLOCK_SIZE;
+            dataLeft -= BLOCK_SIZE;
+        }
+
+        blocks[this->file->externals[this->file->externals.size() - 1]].second = original.substr(tmp, dataLeft);
+    }
+
+    string readFrom(vector<pair<bool, string>>& blocks, int readPos, int readSize) {
+        string data = "";
+
+        for (int i = 0; i < this->file->externals.size(); ++i) {
+            data += blocks[this->file->externals[i]].second;
+        }
+
+        return data.substr(readPos, readSize);
+    }
 };
 
 // utilities
@@ -193,8 +239,25 @@ int main() {
                     int use;
                     cin >> use;
 
-                    if (use == 1) {fileObject->append(blocks, freeBlock, freedBlockList);}
-                    // else if (use == 2) {fileObject->writeAt();}
+                    if (use == 1) {
+                        string data;
+                        cout << "Enter content to write in file: ";
+                        cin.ignore();
+                        getline(cin, data);
+                        fileObject->append(blocks, freeBlock, freedBlockList, data);
+                    }
+                    else if (use == 2) {
+                        string data;
+                        cout << "Enter content to write in file: ";
+                        cin.ignore();
+                        getline(cin, data);
+
+                        int writePos;
+                        cout << "Enter write position: ";
+                        cin >> writePos;
+
+                        fileObject->writeAt(blocks, freeBlock, freedBlockList, data, writePos);
+                    }
                 }
                 else if (mode == 'r') {
                     cout << "1. Read all\n";
@@ -204,8 +267,15 @@ int main() {
                     int use;
                     cin >> use;
 
-                    // if (use == 1) {fileObject->read();}
-                    // else if (use == 2) {fileObject->readFrom();}
+                    if (use == 1) {cout << fileObject->read(blocks) << '\n';}
+                    else if (use == 2) {
+                        int readPos, readSize;
+                        cout << "Enter read position: ";
+                        cin >> readPos;
+                        cout << "Enter read size: ";
+                        cin >> readSize;
+                        cout << fileObject->readFrom(blocks, readPos, readSize) << '\n';
+                    }
                 }
                 break;
             }
@@ -223,6 +293,7 @@ int main() {
                 break;
             }
             case 7: {
+                freeTree(root);
                 root = reconstruct();
                 currentDirectory = root;
                 readContent(blocks);
@@ -230,9 +301,8 @@ int main() {
             }
             default: {
                 bfs(root);
-                freeTree(root);
                 writeContent(blocks);
-                //exit(0);
+                exit(0);
             }
         }
     } while(true);
@@ -332,7 +402,7 @@ void bfs(FDIR* root) {
             tmp = tmp + "," + to_string(p->externals[i]);
         }
 
-        structFile << p->name << ',' << 0 << ',' << (int) p->type << ',' << p->childrens.size() << ',' << p->numberOfBlocks << tmp << "\n";
+        structFile << p->name << ',' << p->size << ',' << (int) p->type << ',' << p->childrens.size() << ',' << p->numberOfBlocks << tmp << "\n";
         q.pop();
 
         for (int i = 0; i < p->childrens.size(); ++i){
@@ -668,11 +738,17 @@ void getFreeBlockIndex(vector<int>& freedBlockList, int& freeBlock) {
 void writeContent(vector<pair<bool, string>>& blocks) {
     FILE* p = fopen("sample.data", "w");
 
+
     for (int i = 0; i < blocks.size(); ++i) {
         CONTENT* cnt = new CONTENT();
-        cnt->content = blocks[i].second;
+
+        strcpy(cnt->content, blocks[i].second.c_str());
+
         cnt->used = blocks[i].first;
-        fwrite(cnt, sizeof(CONTENT), 1, p);   
+
+        fwrite(cnt, sizeof(CONTENT), 1, p);
+        
+        delete cnt;
     }
 
     fclose(p);
@@ -684,7 +760,11 @@ void readContent(vector<pair<bool, string>>& blocks) {
     CONTENT *cnt = new CONTENT();
     for (int i = 0; i < blocks.size(); ++i) {
         fread(cnt, sizeof(CONTENT), 1, p);
-        blocks[i].second = cnt->content;
+
+        string s(cnt->content);
+        s = s.substr(0, BLOCK_SIZE);
+        blocks[i].second = s;
+        
         blocks[i].first = cnt->used;
     }
 

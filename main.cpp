@@ -240,6 +240,7 @@ void deleteFile(string, FDIR*, FDIR*, vector<pair<bool, string>>&, vector<int>&)
 void moveFile(string, string, FDIR*, FDIR*);
 FileObject* openFile(string, char, FDIR*, FDIR*);
 void displayFileInfo(FDIR*);
+void memoryMap(FDIR*, int);
 
 int main() {
     // blocks vector with fixed size
@@ -400,7 +401,8 @@ int main() {
                 break;
             }
             case 8: {
-                displayFileInfo(root);
+                // displayFileInfo(root);
+                memoryMap(root, 0);
                 break;
             }
             default: {
@@ -931,5 +933,17 @@ void displayFileInfo(FDIR* root){
                 q.push(p->childrens[i]);
             }
         }
+    }
+}
+
+void memoryMap(FDIR* root, int spaces) {
+    if (root == NULL) {
+        return;
+    }
+    string s = "";
+    for (int i = 0; i < spaces; ++i) {s += "-";}
+    cout << s + root->name << "\n";
+    for (int i = 0; i < root->childrens.size(); ++i) {
+        memoryMap(root->childrens[i], spaces + 1);
     }
 }

@@ -253,6 +253,17 @@ int main() {
     FDIR *root = createTree(freeBlock, blocks, freedBlockList);
     FDIR *currentDirectory = root;
 
+
+    cout << "1. Make directory\n";
+    cout << "2. Create file\n";
+    cout << "3. Change directory\n";
+    cout << "4. Delete file\n";
+    cout << "5. Read/Write/Move within/Truncate file\n";
+    cout << "6. Move files\n";
+    cout << "7. Reconstruct\n";
+    cout << "8. Memory Map\n";
+    cout << "9. Exit\n";
+
     do {
         int choice;
         cout << "Enter choice: ";
@@ -401,7 +412,8 @@ int main() {
                 break;
             }
             case 8: {
-                // displayFileInfo(root);
+                displayFileInfo(root);
+                cout << "---------------------------------------------------------------------------\n";
                 memoryMap(root, 0);
                 break;
             }
@@ -942,6 +954,7 @@ void memoryMap(FDIR* root, int spaces) {
     }
     string s = "";
     for (int i = 0; i < spaces; ++i) {s += "-";}
+
     cout << s + root->name << "\n";
     for (int i = 0; i < root->childrens.size(); ++i) {
         memoryMap(root->childrens[i], spaces + 1);

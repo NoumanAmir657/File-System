@@ -1,8 +1,3 @@
-// add same file and dir name check
-// file does not exist check when deleting
-// check for running out of blocks in append
-// dir not exist or file not exist in move
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -412,7 +407,7 @@ int main() {
                 break;
             }
             case 8: {
-                displayFileInfo(root);
+                // displayFileInfo(root);
                 cout << "---------------------------------------------------------------------------\n";
                 memoryMap(root, 0);
                 break;

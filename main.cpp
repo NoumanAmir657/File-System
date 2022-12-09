@@ -407,7 +407,7 @@ int main() {
                 break;
             }
             case 8: {
-                // displayFileInfo(root);
+                displayFileInfo(root);
                 cout << "---------------------------------------------------------------------------\n";
                 memoryMap(root, 0);
                 break;
@@ -798,7 +798,7 @@ FDIR* chDir(FDIR* root, FDIR* currentDirectory, vector<string>& tokens, int star
                     break;
                 }
                 else {
-                    valid = false;
+                    valid = false; // see
                 }
             }
         }

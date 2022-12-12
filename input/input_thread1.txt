@@ -1,0 +1,15 @@
+chdir /dir1
+create /dir1/f11
+open /dir1/f11 w
+write_to_file /dir1/f11 abcd
+create /dir1/f12
+open /dir1/f12 w
+show_memory_map
+write_to_file /dir1/f11 123
+write_to_file /dir1/f12 xyz
+read_from_file /dir1/f11
+close /dir1/f11
+close /dir1/f12
+read_from_file /dir1/f11
+show_memory_map
+move /f2 /dir1/dir4

@@ -1,0 +1,13 @@
+Changed directory to root/dir1
+Created file /dir1/f11
+Opened file /dir1/f11
+Wrote to file f11
+Created file /dir1/f12
+Opened file /dir1/f12
+Wrote to file f11
+Wrote to file f12
+Read from file "abcd123"
+Closed file /dir1/f11
+Closed file /dir1/f12
+Open file first!
+Moved file /f2 to /dir1/dir4

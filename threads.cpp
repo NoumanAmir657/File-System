@@ -39,10 +39,12 @@ struct FDIR {
 
 // blocks vector with fixed size
 vector<pair<bool, string>> blocks(TOTAL_MEMORY/BLOCK_SIZE);
+
 // freed block list
 vector<int> freedBlockList;
 
 int freeBlock = 0;
+
 // keeps track of the free block
 FDIR *root;
 FDIR* createTree();
@@ -51,8 +53,6 @@ FDIR *x = createTree();
 bool hasReachedEnd = false;
 
 mutex gLock;
-
-
 
 void getFreeBlockIndex();
 
@@ -256,6 +256,7 @@ struct FileObject {
 };
 
 vector<FileObject*> openFileTable;
+
 // utilities
 void bfs(FDIR *);
 FDIR* reconstruct();

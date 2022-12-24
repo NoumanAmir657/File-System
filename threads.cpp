@@ -5,11 +5,18 @@
 #include <sstream>
 #include <utility>
 #include <string.h>
+#include <stdlib.h>
 
 #include <thread>
 #include <mutex>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 using namespace std;
+
+#define PORT 8080
 
 #define BLOCK_SIZE 16
 #define TOTAL_MEMORY 256
@@ -46,13 +53,14 @@ vector<int> freedBlockList;
 int freeBlock = 0;
 
 // keeps track of the free block
+
 FDIR *root;
 FDIR* createTree();
 FDIR *x = createTree();
 
 bool hasReachedEnd = false;
 
-mutex gLock;
+// mutex gLock;
 
 void getFreeBlockIndex();
 
@@ -71,7 +79,7 @@ struct FileObject {
         bool flag = false;
         for (int i = 0; i < openFileTable.size(); ++i) {
             if (openFileTable[i]->name == this->name && (openFileTable[i]->mode == 'w' || openFileTable[i]->mode == 't')) {
-                gLock.lock();
+                // gLock.lock();
                 flag = true;
                 break;
             }
@@ -132,13 +140,15 @@ struct FileObject {
             tmp = tmp->parent;
         }
 
-        if (flag) {gLock.unlock();}
+        // if (flag) {gLock.unlock();}
     }
 
     string read() {
         string data = "";
+        cout << this->file->name << endl;
 
         for (int i = 0; i < this->file->externals.size(); ++i) {
+            
             data += blocks[this->file->externals[i]].second;
         }
 
@@ -205,7 +215,7 @@ struct FileObject {
         bool flag = false;
         for (int i = 0; i < openFileTable.size(); ++i) {
             if (openFileTable[i]->name == this->name && (openFileTable[i]->mode == 'w' || openFileTable[i]->mode == 't')) {
-                gLock.lock();
+                // gLock.lock();
                 flag = true;
                 break;
             }
@@ -251,7 +261,7 @@ struct FileObject {
         this->file->size = original.length();
         this->file->numberOfBlocks = this->file->externals.size();
         
-        if (flag) {gLock.unlock();}
+        // if (flag) {gLock.unlock();}
     }
 };
 
@@ -279,9 +289,9 @@ void moveFile(string, string, FDIR*);
 FileObject* openFile(string, char, FDIR*);
 void closeFile(string path);
 
-void displayFileInfo(FDIR*);
+void displayFileInfo(FDIR*, string&);
 
-void memoryMap(FDIR*, int);
+void memoryMap(FDIR*, int, string&);
 
 FileObject* findInOpenFileTable(string name) {
     FileObject *file = NULL;
@@ -296,12 +306,12 @@ FileObject* findInOpenFileTable(string name) {
 FileObject* write_to_file(string name, string data, vector<FileObject*>& openFileTable) {
     FileObject *file = findInOpenFileTable(name);
     
-    if (file != NULL) {
+    if (file != NULL && file->mode == 'w') {
         file->append(data, openFileTable);
         return file;
     }
     else {
-        return file;
+        return NULL;
     }
 }
 
@@ -313,7 +323,7 @@ FileObject* read_from_file(string name) {
 FileObject* truncate_file(string name, int size, vector<FileObject*>& openFileTable) {
     FileObject *file = findInOpenFileTable(name);
     
-    if (file != NULL) {
+    if (file != NULL && file->mode == 't') {
         file->truncateFile(size, openFileTable);
         return file;
     }
@@ -322,36 +332,53 @@ FileObject* truncate_file(string name, int size, vector<FileObject*>& openFileTa
     }
 }
 
-void menu(ofstream &outputFile, ifstream &inputFile, FDIR* currentDirectory) {
-    string line;
-    while(getline(inputFile, line)) {
+void menu(int new_socket, FDIR* currentDirectory) {
+    cout << "Connection Established: " << new_socket << endl;
+    
+    while(1) {
+        char line[1024] = {0};
+        int valread = read(new_socket, line, 1024);
         stringstream ss(line);
         string tmp;
         vector<string> tmps;
-
+    
         while(getline(ss, tmp, ' ')) {
             tmps.push_back(tmp);
-        }
+        }    
 
         string command = tmps[0];
+        
         if (command == "create") {
             string path = tmps[1];
             createFile(path, currentDirectory);
 
-            outputFile << "Created file " << path << endl;
+            string res = "File Created Successfully!";
+            const char *response = res.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
         else if (command == "open") {
             string path = tmps[1];
             char mode = tmps[2].c_str()[0];
             FileObject* file = openFile(path, mode, currentDirectory);
 
-            outputFile << "Opened file " << path << endl;
+            if (file != NULL) {
+                string res = "File Opened Successfully!";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
+            }
+            else {
+                string res = "File Already Open";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
+            }
         }
         else if (command == "close") {
             string path = tmps[1];
             closeFile(path);
 
-            outputFile << "Closed file " << path << endl;
+            string res = "File Closed Successfully!";
+            const char *response = res.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
         else if (command == "move") {
             string srcPath = tmps[1];
@@ -359,20 +386,27 @@ void menu(ofstream &outputFile, ifstream &inputFile, FDIR* currentDirectory) {
 
             moveFile(srcPath, destPath, currentDirectory);
 
-            outputFile << "Moved file " << srcPath << " to " << destPath << endl;
+            string res = "File Moved Successfully!";
+            const char *response = res.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
         else if (command == "delete") {
             string path = tmps[1];
             closeFile(path);
 
             deleteFile(path, currentDirectory);
-            outputFile << "Deleted file " << path << endl;
+            
+            string res = "File Deleted Successfully!";
+            const char *response = res.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
         else if (command == "chdir") {
             string path = tmps[1];
             currentDirectory = chDir(root, currentDirectory, path);
 
-            outputFile << "Changed directory to " << getPath(currentDirectory) << endl;
+            string res = "Changed directory to " + getPath(currentDirectory);
+            const char *response = res.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
         else if (command == "write_to_file") {
             string path = tmps[1];
@@ -385,10 +419,14 @@ void menu(ofstream &outputFile, ifstream &inputFile, FDIR* currentDirectory) {
             FileObject *file = write_to_file(name, data, openFileTable);
 
             if (file == NULL) {
-                outputFile << "Open file first!" << endl;    
+                string res = "Either the file is not open or it is being used by another client";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
             }
             else {
-                outputFile << "Wrote to file " << name << endl;
+                string res = "Wrote to file!";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
             }
         }
         else if (command == "read_from_file") {
@@ -398,13 +436,19 @@ void menu(ofstream &outputFile, ifstream &inputFile, FDIR* currentDirectory) {
             tokenizePath(path, tokens);
             string name = tokens[tokens.size() - 1];
 
-            FileObject *file = read_from_file(name);
-
-            if (file == NULL) {
-                outputFile << "Open file first!" << endl;
+            if (findInOpenFileTable(name) == NULL) {
+                FDIR *tmp = chDir(root, currentDirectory, tokens, path[0] == '/' ? 1 : 0);
+                FileObject* file = new FileObject(tmp, 'r', name);
+                string res = "Read from file: " + file->read();
+                cout << "die" << endl;
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
             }
             else {
-                outputFile << "Read from file \"" << file->read() << "\"" << endl;
+                cout << "here" << endl;
+                string res = "File is opened for either write or truncate. Read operation not allowed in these conditions";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
             }
         }
         else if (command == "truncate_file") {
@@ -418,85 +462,90 @@ void menu(ofstream &outputFile, ifstream &inputFile, FDIR* currentDirectory) {
             FileObject *file = truncate_file(name, size, openFileTable);
 
             if (file == NULL) {
-                outputFile << "Open file first!" << endl;    
+                string res = "Either the file is not open or it is being used by another client";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);    
             }
             else {
-                outputFile << "Truncated file " << name << endl;
+                string res = "Truncated file!";
+                const char *response = res.c_str();
+                send(new_socket, response, strlen(response), 0);
             }
         }
         else if (command == "show_memory_map") {
-            memoryMap(root, 0);
-            displayFileInfo(root);
+            string s;
+            memoryMap(root, 0, s);
+
+            string c;
+            displayFileInfo(root, c);
+
+            string r = s + "\n" + c;
+
+            const char *response = r.c_str();
+            send(new_socket, response, strlen(response), 0);
         }
     }
-}
 
-void tf1(FDIR* currentDirectory) {
-    ofstream outputFile;
-    outputFile.open("output/output_thread1.txt");
-
-    ifstream inputFile;
-    inputFile.open("input/input_thread1.txt");
-
-    menu(outputFile, inputFile, currentDirectory);
-}
-
-void tf2(FDIR* currentDirectory) {
-    ofstream outputFile;
-    outputFile.open("output/output_thread2.txt");
-
-    ifstream inputFile;
-    inputFile.open("input/input_thread2.txt");
-
-    menu(outputFile, inputFile, currentDirectory);
-}
-
-void tf3(FDIR* currentDirectory) {
-    ofstream outputFile;
-    outputFile.open("output/output_thread3.txt");
-
-    ifstream inputFile;
-    inputFile.open("input/input_thread3.txt");
-
-    menu(outputFile, inputFile, currentDirectory);
-}
-
-void tf4(FDIR* currentDirectory) {
-    ofstream outputFile;
-    outputFile.open("output/output_thread4.txt");
-
-    ifstream inputFile;
-    inputFile.open("input/input_thread4.txt");
-
-    menu(outputFile, inputFile, currentDirectory);
+    close(new_socket);
 }
 
 int main() {
-    cout << "-----------------------------------------------------------------------------------\n";
     FDIR *currentDirectory = root;
 
-    tf1(currentDirectory);
+    int server_fd;
+	struct sockaddr_in address;
+	int opt = 1;
+	int addrlen = sizeof(address);
+
+	// Creating socket file descriptor
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket failed");
+		exit(EXIT_FAILURE);
+	}
+
+	// Forcefully attaching socket to the port 8080
+	if (setsockopt(server_fd, SOL_SOCKET,
+				SO_REUSEADDR | SO_REUSEPORT, &opt,
+				sizeof(opt))) {
+		perror("setsockopt");
+		exit(EXIT_FAILURE);
+	}
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons(PORT);
+
+	// Forcefully attaching socket to the port 8080
+	if (bind(server_fd, (struct sockaddr*)&address,
+			sizeof(address))
+		< 0) {
+		perror("bind failed");
+		exit(EXIT_FAILURE);
+	}
+
+	if (listen(server_fd, 3) < 0) {
+		perror("listen");
+		exit(EXIT_FAILURE);
+	}
+
+	vector<thread> ts;
+	while(1) {
+		int new_socket;
+		if ((new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0) {
+			perror("accept");
+			exit(EXIT_FAILURE);
+		}
+
+		ts.push_back(thread(menu, new_socket, currentDirectory));
+		cout << "Size of thread array: " << ts.size() << endl;
+	}
+
+	// join threads
+	for (int i = 0; i < ts.size(); ++i) {
+		ts[i].join();
+	}
+
+	// shutdown(server_fd, SHUT_RDWR);
     
-    // thread t1(tf1, currentDirectory);
-    // thread t2(tf2, currentDirectory);
-    // thread t3(tf3, currentDirectory);
-    // thread t4(tf4, currentDirectory);
-    // thread t5(tf5, currentDirectory);
-    // thread t6(tf6, currentDirectory);
-    // thread t7(tf7, currentDirectory);
-
-    // t1.join();
-    // t2.join();
-    // t3.join();
-    // t4.join();
-    // t5.join();
-    // t6.join();
-    // t7.join();
-
-    cout << "Joined\n";
-
-    memoryMap(root, 0);
-    displayFileInfo(root);
     return 0;
 }
 
@@ -674,7 +723,7 @@ void createFile(string path, FDIR* currentDirectory) {
     
     newDir->numberOfBlocks = 1;
 
-    gLock.lock();
+    // gLock.lock();
 
     cout << "Creating FILE " << name << endl;
     newDir->externals.push_back(freeBlock); // reads freeBlock
@@ -692,7 +741,7 @@ void createFile(string path, FDIR* currentDirectory) {
     currentDirectory->numberOfChildren++;
     
     // memoryMap(root, 0);
-    gLock.unlock();
+    // gLock.unlock();
 }
 
 void deleteFile(string path, FDIR* currentDirectory) {
@@ -712,7 +761,7 @@ void deleteFile(string path, FDIR* currentDirectory) {
     }
 
     // place lock here
-    gLock.lock();
+    // gLock.lock();
     cout << "Delete FILE " << name << endl;
     int tmp = -1;
     for (int i = 0; i < currentDirectory->childrens.size(); ++i) {
@@ -754,7 +803,7 @@ void deleteFile(string path, FDIR* currentDirectory) {
         cout << "File not found in the specified directory!\n";
     }
     // memoryMap(root, 0);
-    gLock.unlock();
+    // gLock.unlock();
 }
 
 void moveFile(string source, string dest, FDIR* currentDirectory) {
@@ -789,7 +838,7 @@ void moveFile(string source, string dest, FDIR* currentDirectory) {
         }
     }
 
-    gLock.lock();
+    // gLock.lock();
     cout << "Moved File " << sourceName << endl;
     // change size
     sourceDir->size -= sourceDir->childrens[tmp]->size;
@@ -817,7 +866,7 @@ void moveFile(string source, string dest, FDIR* currentDirectory) {
     sourceDir->childrens.pop_back();
     sourceDir->numberOfChildren--; 
 
-    gLock.unlock();
+    // gLock.unlock();
 }
 
 FDIR* chDir(FDIR* root, FDIR* currentDirectory, string path) {
@@ -903,13 +952,12 @@ FileObject* openFile(string path, char mode, FDIR* currentDirectory) {
     if (currentDirectory->type == 1) {
         fileObject = new FileObject(currentDirectory, mode, name);
 
-        int flag = false;
         for (int i = 0; i < openFileTable.size(); ++i) {
             if (openFileTable[i]->name == name) {
-                flag = true;
+                return NULL;
             }
         }
-        if (!flag) {openFileTable.push_back(fileObject);}
+        openFileTable.push_back(fileObject);
     }
 
     return fileObject;
@@ -985,7 +1033,7 @@ void readContent(vector<pair<bool, string>>& blocks) {
     fclose(p);
 }
 
-void displayFileInfo(FDIR* root){
+void displayFileInfo(FDIR* root, string &c){
     queue<FDIR*> q;
     FDIR *p = root;
 
@@ -1003,12 +1051,12 @@ void displayFileInfo(FDIR* root){
         }
 
         if (p->type == 1) {
-            cout << "File name:\t\t" << p->name << '\n';
-            cout << "Parent Directory:\t" << p->parent->name << '\n';
-            cout << "Size:\t\t\t" << p->size << '\n';
-            cout << "Number of Blocks:\t" << p->numberOfBlocks << '\n';
-            cout << "Blocks List:\t\t" << tmp << '\n';
-            cout << "\n\n";
+            c += "File name:\t\t" + p->name + '\n';
+            c += "Parent Directory:\t" + p->parent->name + '\n';
+            c += "Size:\t\t\t" + to_string(p->size) + '\n';
+            c += "Number of Blocks:\t" + to_string(p->numberOfBlocks) + '\n';
+            c += "Blocks List:\t\t" + tmp + '\n';
+            c += "\n\n";
         }
 
         for (int i = 0; i < p->childrens.size(); ++i){
@@ -1019,15 +1067,14 @@ void displayFileInfo(FDIR* root){
     }
 }
 
-void memoryMap(FDIR* root, int spaces) {
+void memoryMap(FDIR* root, int spaces, string& s) {
     if (root == NULL) {
         return;
     }
-    string s = "";
     for (int i = 0; i < spaces; ++i) {s += "-";}
 
-    cout << s + root->name << "\n";
+    s = s + root->name + "\n";
     for (int i = 0; i < root->childrens.size(); ++i) {
-        memoryMap(root->childrens[i], spaces + 1);
+        memoryMap(root->childrens[i], spaces + 1, s);
     }
 }

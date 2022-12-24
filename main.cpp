@@ -234,8 +234,8 @@ void createFile(string, FDIR*, FDIR*, int&, vector<pair<bool, string>>&, vector<
 void deleteFile(string, FDIR*, FDIR*, vector<pair<bool, string>>&, vector<int>&);
 void moveFile(string, string, FDIR*, FDIR*);
 FileObject* openFile(string, char, FDIR*, FDIR*);
-void displayFileInfo(FDIR*);
-void memoryMap(FDIR*, int);
+void displayFileInfo(FDIR*, string&);
+void memoryMap(FDIR*, int, string&);
 
 int main() {
     // blocks vector with fixed size
@@ -407,9 +407,13 @@ int main() {
                 break;
             }
             case 8: {
-                displayFileInfo(root);
-                cout << "---------------------------------------------------------------------------\n";
-                memoryMap(root, 0);
+                string c;
+                displayFileInfo(root, c);
+                cout << c;
+                // cout << "---------------------------------------------------------------------------\n";
+                string s;
+                memoryMap(root, 0, s);
+                cout << s;
                 break;
             }
             default: {
@@ -866,7 +870,7 @@ void readContent(vector<pair<bool, string>>& blocks) {
     fclose(p);
 }
 
-void displayFileInfo(FDIR* root){
+void displayFileInfo(FDIR* root, string &c){
     queue<FDIR*> q;
     FDIR *p = root;
 
@@ -884,12 +888,12 @@ void displayFileInfo(FDIR* root){
         }
 
         if (p->type == 1) {
-            cout << "File name:\t\t" << p->name << '\n';
-            cout << "Parent Directory:\t" << p->parent->name << '\n';
-            cout << "Size:\t\t\t" << p->size << '\n';
-            cout << "Number of Blocks:\t" << p->numberOfBlocks << '\n';
-            cout << "Blocks List:\t\t" << tmp << '\n';
-            cout << "\n\n";
+            c += "File name:\t\t" + p->name + '\n';
+            c += "Parent Directory:\t" + p->parent->name + '\n';
+            c += "Size:\t\t\t" + to_string(p->size) + '\n';
+            c += "Number of Blocks:\t" + to_string(p->numberOfBlocks) + '\n';
+            c += "Blocks List:\t\t" + tmp + '\n';
+            c += "\n\n";
         }
 
         for (int i = 0; i < p->childrens.size(); ++i){
@@ -900,15 +904,15 @@ void displayFileInfo(FDIR* root){
     }
 }
 
-void memoryMap(FDIR* root, int spaces) {
+void memoryMap(FDIR* root, int spaces, string& s) {
     if (root == NULL) {
         return;
     }
-    string s = "";
+    // string s = "";
     for (int i = 0; i < spaces; ++i) {s += "-";}
 
-    cout << s + root->name << "\n";
+    s = s + root->name + "\n";
     for (int i = 0; i < root->childrens.size(); ++i) {
-        memoryMap(root->childrens[i], spaces + 1);
+        memoryMap(root->childrens[i], spaces + 1, s);
     }
 }
